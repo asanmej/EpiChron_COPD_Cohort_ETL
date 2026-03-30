@@ -1,5 +1,5 @@
 # Author: Alejandro Santos Mejías
-# Date last update: 2026-03-17
+# Date last update: 2026-03-30
 # Script name: Create_Patient_table.R
 # Aims: To create Sociodemografico table, the table contains information of 
 # sociodemografic variables of people recruited at baseline
@@ -78,7 +78,8 @@ survey <- survey[, .(record_id,
                      oss_result, 
                      private_hospital_visit, 
                      private_urgency_visit, 
-                     date_sociodemographic
+                     date_sociodemographic,
+                     smwt_distancia_total
                      )]
 setnames(survey, "record_id", "id_redcap")
 
@@ -105,11 +106,28 @@ patient[survey,
           "oslo_score",
           "private_hospital_visits",
           "private_emergency_visits",
-          "date_start_followup") := mget(paste0("i.", cols)),
+          "date_start_followup",
+          "smwt_distancia_total") := mget(paste0("i.", cols)),
         on = "id_redcap" 
 ]
 
-# Add COPD
+# Add COPD date
 patient[copd, c("date_of_copd") := i.fecha_diagnostico, on = "id_redcap"]
+# Assign missing COPD date to date_start_followup
+patient[is.na(date_of_copd), date_of_copd := date_start_followup]
+
+# Add BODE index
+ffev1 <- append_file(directory = path_data, pattern = "^FFEV1.csv$", label = NULL)
+ffev1[, fev1_bode := as.integer(cut(as.double(valor), breaks = c(-Inf,35,49,64, Inf), labels = c("3", "2", "1", "0")))]
+patient <- merge(patient, ffev1[, .(id_redcap, fev1_bode)])
+rm(ffev1)
+patient[, smwt_bode := as.integer(cut(as.double(smwt_distancia_total), c(-Inf, 149, 249, 349, Inf), labels = c("3","2", "1", "0")))]
+patient[, bmi_bode := as.integer(ifelse(as.double(bmi) > 21, 0, 1))]
+patient[, mmrc_bode := as.integer(ifelse(as.integer(disnea_level) <= 1, 0, disnea_level))]
+patient[, bode_index := fev1_bode + smwt_bode + mmrc_bode + bmi_bode]
+patient[, grep("bode$", names(patient), value = T) := NULL]
+
+# Fix colnames
+setnames(patient, "smwt_distancia_total", "smwt_total_distance")
 
 fwrite(patient , paste0(path_output, "PATIENTS.csv"))
