@@ -119,7 +119,7 @@ patient[is.na(date_of_copd), date_of_copd := date_start_followup]
 # Add BODE index
 ffev1 <- append_file(directory = path_data, pattern = "^FFEV1.csv$", label = NULL)
 ffev1[, fev1_bode := as.integer(cut(as.double(valor), breaks = c(-Inf,35,49,64, Inf), labels = c("3", "2", "1", "0")))]
-patient <- merge(patient, ffev1[, .(id_redcap, fev1_bode)])
+patient <- merge(patient, ffev1[, .(id_redcap, fev1_bode)], all.x = T)
 rm(ffev1)
 patient[, smwt_bode := as.integer(cut(as.double(smwt_distancia_total), c(-Inf, 149, 249, 349, Inf), labels = c("3","2", "1", "0")))]
 patient[, bmi_bode := as.integer(ifelse(as.double(bmi) > 21, 0, 1))]
