@@ -11,7 +11,10 @@ gc()
 source("98_packages.R")
 
 ffev <- append_file(directory = path_data, pattern = "^FFEV.*\\.csv", label = NULL)
+
 fixFechas(ffev)
+idToInclude <- fread(paste0(path_output, "PATIENTS.csv"), encoding = "UTF-8", select = "id_redcap")[, id_redcap]
+ffev <- ffev[id_redcap %in% idToInclude]
 
 ffev[, codigo_dgp := NULL]
 setnames(ffev, c("fecha", "valor"), c("date_of_ffev", "value"))

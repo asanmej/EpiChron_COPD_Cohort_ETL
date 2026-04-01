@@ -14,6 +14,8 @@ survey_date <- append_file(directory = path_data, pattern = "^REDCAP_Epichron.*\
 
 fixBlankSpaces(survey_date)
 fixFechas(survey_date)
+idToInclude <- fread(paste0(path_output, "PATIENTS.csv"), encoding = "UTF-8", select = "id_redcap")[, id_redcap]
+survey_date <- survey_date[id_redcap %in% idToInclude]
 
 # Prepare range of dates for each id and event
 survey_date[, redcap_event_name := factor(redcap_event_name, levels = c("basal_arm_1", "ao_1_arm_1", "ao_2_arm_1", "ao_3_arm_1", "ao_4_arm_1", "ao_5_arm_1"))]

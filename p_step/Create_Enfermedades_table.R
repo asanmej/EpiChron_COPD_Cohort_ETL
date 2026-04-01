@@ -21,6 +21,10 @@ dic_body_system <- fread("Y:/BIBLIOGRAFIA Y DOCUMENTACIÓN/R_mapeo_cie9_ccs/body
 # Load data:
 enf <- append_file(directory = path_data, pattern = "^diagnosticos_ap.csv", label = NULL)
 
+fixBlankSpaces(enf)
+idToInclude <- fread(paste0(path_output, "PATIENTS.csv"), encoding = "UTF-8", select = "id_redcap")[, id_redcap]
+enf <- enf[id_redcap %in% idToInclude]
+
 # Transform ICPC to ICD9:
 enf_icd9 <- map_cie9(
   diagnosis = enf,

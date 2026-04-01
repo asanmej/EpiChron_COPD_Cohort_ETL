@@ -14,7 +14,10 @@ cols <- c("record_id", "redcap_event_name", "exacerbaciones_check_date", paste0(
 exacerbations <- append_file(directory = path_data, pattern = "^REDCAP_Epichron.*\\.csv", label = NULL, sep = ",", select = cols)
 setnames(exacerbations, c("record_id", "redcap_event_name", "exacerbaciones_check_date"), c("id_redcap", "event_name", "event_end_date"))
 
+# Fix and amend
 fixBlankSpaces(exacerbations)
+idToInclude <- fread(paste0(path_output, "PATIENTS.csv"), encoding = "UTF-8", select = "id_redcap")[, id_redcap]
+exacerbations <- exacerbations[id_redcap %in% idToInclude]
 
 # Set up range of date for each event
 exacerbations[, event_name := factor(event_name, levels = c("basal_arm_1", "ao_1_arm_1", "ao_2_arm_1", "ao_3_arm_1", "ao_4_arm_1", "ao_5_arm_1"))]
