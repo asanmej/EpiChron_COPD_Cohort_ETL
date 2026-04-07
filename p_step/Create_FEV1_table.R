@@ -1,6 +1,6 @@
 # Author: Alejandro Santos Mejías
 # Date last update: 2026-03-18
-# Script name: Create_FFEV1_table.R
+# Script name: Create_FEV1_table.R
 # Aims: To create FFEV1 table, it contains the value of Forced expiratory volume in 1 second.
 # It is used to diagnose pulmonary capacity, very useful in COPD
 
@@ -19,4 +19,6 @@ ffev <- ffev[id_redcap %in% idToInclude]
 ffev[, codigo_dgp := NULL]
 setnames(ffev, c("fecha", "valor"), c("date_of_ffev", "value"))
 
-fwrite(ffev[, .(id_redcap, date_of_ffev, value)], file = paste0(path_output, "FFEV1.csv"), encoding = "UTF-8")
+# TODO set date to YYYY-MM-DD format 
+
+fwrite(ffev[, .(id_redcap, date_of_ffev, value)], file = paste0(path_output, "FEV1.csv"), encoding = "UTF-8")
