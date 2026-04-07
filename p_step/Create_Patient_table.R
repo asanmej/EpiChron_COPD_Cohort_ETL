@@ -46,16 +46,30 @@ cols <- setdiff(names(bdu_enriched), "id_redcap")
 # Next Observation carried backward imputation
 bdu_enriched[, (cols) := lapply(.SD, function(x){zoo::na.locf(x, na.rm = F, fromLast = T)}), .SDcols = cols, by = id_redcap]
 bdu_clean <- unique(bdu_enriched, by = "id_redcap")
-
-patient[bdu_clean,
-        c("sex", 
-          "year_of_birth", 
-          "date_of_death", 
-          "country_of_birth", 
-          "nationality", 
-          "anual_income") := mget(paste0("i.", cols)),
-        on = "id_redcap" 
-        ]
+# Recode tsi to anual_income categories
+dic_tsi <- setDT(readxl::read_xlsx(paste0(path_param, "tsi_levels.xlsx"), sheet = 1, col_types = "text"))
+setnames(dic_tsi, "tsi_level", "tsi")
+bdu_clean[, tsi := gsub(" ", "", tsi)]
+bdu_clean <- merge(bdu_clean, dic_tsi[, .(tsi, tsi_level_epoc)], by = "tsi", all.x = T)
+# To update later on missing info with bdu they must share same name
+setnames(
+  bdu_clean,
+  c("sexo", 
+    "anyo_nac", 
+    "fecha_fallecimiento",
+    "pais_nacimiento",
+    "nacionalidad",
+    "tsi_level_epoc"),
+  c(
+    "sex",
+    "year_of_birth",
+    "date_of_death",
+    "country_of_birth",
+    "nationality",
+    "anual_income"
+  )
+)
+bdu_clean[, tsi:= NULL]
 
 # Select variables needed for PATIENTS table, check CODEBOOK for meaning
 survey <- survey[, .(record_id, 
@@ -111,14 +125,37 @@ patient[survey,
         on = "id_redcap" 
 ]
 
+# Update those with still missing data with bdu info.
+cols <- c("sex", 
+          "year_of_birth", 
+          "date_of_death", 
+          "country_of_birth", 
+          "nationality", 
+          "anual_income")
+
+patient[, c("sex",
+            "year_of_birth",
+            "date_of_death",
+            "country_of_birth",
+            "nationality") := NA_character_]
+
+for (col_name in cols) {
+  # Actualizamos 'patient' haciendo un join con 'bdu_clean' por 'id_redcap'
+  # Solo se asigna el valor si el campo original en 'patient' es NA
+  patient[is.na(get(col_name)), 
+          (col_name) := bdu_clean[.SD, get(col_name), on = "id_redcap"], 
+          .SDcols = "id_redcap"]
+}
+
+
 # Add COPD date
 patient[copd, c("date_of_copd") := i.fecha_diagnostico, on = "id_redcap"]
 # Assign missing COPD date to date_start_followup
 patient[is.na(date_of_copd), date_of_copd := date_start_followup]
 
 # Add BODE index
-ffev1 <- append_file(directory = path_data, pattern = "^FFEV1.csv$", label = NULL)
-ffev1[, fev1_bode := as.integer(cut(as.double(valor), breaks = c(-Inf,35,49,64, Inf), labels = c("3", "2", "1", "0")))]
+ffev1 <- append_file(directory = path_data, pattern = "^FEV1_v2.csv$", label = NULL)
+ffev1[, fev1_bode := as.integer(cut(as.double(value), breaks = c(-Inf,35,49,64, Inf), labels = c("3", "2", "1", "0")))]
 patient <- merge(patient, ffev1[, .(id_redcap, fev1_bode)], all.x = T)
 rm(ffev1)
 patient[, smwt_bode := as.integer(cut(as.double(smwt_distancia_total), c(-Inf, 149, 249, 349, Inf), labels = c("3","2", "1", "0")))]
@@ -129,5 +166,37 @@ patient[, grep("bode$", names(patient), value = T) := NULL]
 
 # Fix colnames
 setnames(patient, "smwt_distancia_total", "smwt_total_distance")
+
+# Set col order
+setcolorder(patient,
+            c(
+              "id_redcap",
+              "sex",
+              "year_of_birth",
+              "date_of_death",
+              "country_of_birth",
+              "nationality",
+              "height", 
+              "weight", 
+              "bmi", 
+              "money_issue_baseline", 
+              "loneliness_issue_baseline", 
+              "anual_income", 
+              "marital_status", 
+              "smoking_status", 
+              "partner_smoking_status",
+              "disnea_level", 
+              "education_level",
+              "job_level",
+              "lift_status_household",
+              "temperature_issue_household",
+              "meter2_household",
+              "n_household",
+              "oslo_score",
+              "private_hospital_visits",
+              "private_emergency_visits",
+              "date_start_followup",
+              "smwt_total_distance"
+            ))
 
 fwrite(patient , paste0(path_output, "PATIENTS.csv"))
