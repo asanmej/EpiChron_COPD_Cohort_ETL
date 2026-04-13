@@ -10,12 +10,14 @@ gc()
 source("98_packages.R")
 
 # Load data
-survey_date <- append_file(directory = path_data, pattern = "^REDCAP_Epichron.*\\.csv", label = NULL, sep = ",")[, .(record_id, redcap_event_name, exacerbaciones_check_date)]
+survey_date <- append_file(directory = path_data, pattern = "^REDCAP_Epichron.*\\.csv", label = NULL, sep = ",")[, .(record_id, redcap_event_name, exacerbaciones_check_date, private_urgency_visit, private_hospital_visit)]
 
 fixBlankSpaces(survey_date)
 idToInclude <- fread(paste0(path_output, "PATIENTS.csv"), encoding = "UTF-8", select = "id_redcap")[, id_redcap]
-survey_date <- survey_date[id_redcap %in% idToInclude]
-survey_id <- survey_date[, id_redcap]
+survey_date <- survey_date[record_id %in% idToInclude]
+survey_id <- survey_date[, record_id]
+n_priv_visit <- survey_date[, .(record_id, private_urgency_visit, private_hospital_visit)]
+survey_date[, c("private_urgency_visit", "private_hospital_visit") := NULL]
 
 # Prepare range of dates for each id and event
 survey_date[, redcap_event_name := factor(redcap_event_name, levels = c("basal_arm_1", "ao_1_arm_1", "ao_2_arm_1", "ao_3_arm_1", "ao_4_arm_1", "ao_5_arm_1"))]
@@ -51,6 +53,11 @@ result <- hosp[survey_date,
 
 cols <- setdiff(colnames(result), "fecha_ingreso")
 result <- result[, ..cols, with = F]
+# Add private services in basal event_name:
+result <- merge(result, n_priv_visit[, .(record_id, private_hospital_visit)], by.x = "id_redcap", by.y = "record_id", all.x = T)
+result[, hospitalisation := hospitalisation + as.integer(private_hospital_visit)]
+result[, private_hospital_visit := NULL]
+
 
 # Calculate primary care visits
 tmp <- ap[survey_date,
@@ -60,8 +67,8 @@ tmp <- ap[survey_date,
                  fecha_visita <= exacerbaciones_check_date), 
           by = .EACHI]
 
-
 result <- result[tmp[, .(id_redcap, event_name, primary_care)], on = c("id_redcap", "event_name")]
+
 
 # Calculate emergency room
 tmp <- urg[survey_date,
@@ -71,8 +78,12 @@ tmp <- urg[survey_date,
                  fecha_llegada <= exacerbaciones_check_date), 
           by = .EACHI]
 
-
 result <- result[tmp[, .(id_redcap, event_name, emergency_room)], on = c("id_redcap", "event_name")]
+
+# Add private service usage
+result <- merge(result, n_priv_visit[, .(record_id,private_urgency_visit)], by.x = "id_redcap", by.y = "record_id", all.x = T)
+result[, emergency_room := emergency_room + as.integer(private_urgency_visit)]
+result[, private_urgency_visit := NULL]
 
 # Collect starting and end date of each event 
 setnames(survey_date, "redcap_event_name", "event_name")
