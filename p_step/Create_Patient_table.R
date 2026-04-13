@@ -166,6 +166,8 @@ patient[, grep("bode$", names(patient), value = T) := NULL]
 
 # Fix colnames
 setnames(patient, "smwt_distancia_total", "smwt_total_distance")
+# Fix smwt_total_distance = 0 to NA
+patient[smwt_total_distance == 0, smwt_total_distance := NA]
 
 # Set col order
 setcolorder(patient,
